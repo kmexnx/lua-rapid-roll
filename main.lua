@@ -16,6 +16,7 @@ local score = 0
 local gameOver = false
 local gameSpeed = 1.0 -- Multiplicador de velocidad del juego
 local speedIncreaseRate = 0.1 -- Aumenta la velocidad cada 10 puntos
+local platformsToRemove = {}
 
 -- Configuración inicial
 function love.load()
@@ -43,10 +44,10 @@ function love.update(dt)
     local adjustedDt = dt * gameSpeed
     
     -- Mover jugador horizontalmente
-    if love.keyboard.isDown('left') then
+    if love.keyboard.isDown('left') or love.keyboard.isDown('a') then
         player.x = player.x - player.speed * adjustedDt
     end
-    if love.keyboard.isDown('right') then
+    if love.keyboard.isDown('right') or love.keyboard.isDown('d') then
         player.x = player.x + player.speed * adjustedDt
     end
     
@@ -61,24 +62,32 @@ function love.update(dt)
     local baseSpeed = 100
     local platformSpeed = baseSpeed * gameSpeed
     
+    -- Reset the removal list
+    platformsToRemove = {}
+    
     for i, platform in ipairs(platforms) do
         platform.y = platform.y - platformSpeed * adjustedDt
         
-        -- Eliminar plataformas que salen de la pantalla
+        -- Marcar plataformas que salen de la pantalla para eliminarlas
         if platform.y + platform.height < 0 then
-            table.remove(platforms, i)
-            
-            -- Aumentar puntuación
-            score = score + 1
-            
-            -- Aumentar velocidad del juego cada 10 puntos
-            if score % 10 == 0 then
-                gameSpeed = gameSpeed + speedIncreaseRate
-            end
-            
-            -- Crear nueva plataforma en la parte inferior
-            createPlatform(love.graphics.getHeight())
+            table.insert(platformsToRemove, i)
         end
+    end
+    
+    -- Eliminar plataformas en orden inverso para no afectar los índices
+    for i = #platformsToRemove, 1, -1 do
+        table.remove(platforms, platformsToRemove[i])
+        
+        -- Aumentar puntuación
+        score = score + 1
+        
+        -- Aumentar velocidad del juego cada 10 puntos
+        if score % 10 == 0 then
+            gameSpeed = gameSpeed + speedIncreaseRate
+        end
+        
+        -- Crear nueva plataforma en la parte inferior
+        createPlatform(love.graphics.getHeight())
     end
     
     -- Aplicar gravedad al jugador
@@ -104,6 +113,34 @@ function love.update(dt)
     if player.y < 0 then
         player.y = 0
     end
+    
+    -- Asegurar que siempre haya suficientes plataformas
+    ensurePlatforms()
+end
+
+-- Asegurar que siempre haya un mínimo de plataformas
+function ensurePlatforms()
+    local minPlatforms = 5
+    local screenHeight = love.graphics.getHeight()
+    
+    if #platforms < minPlatforms then
+        local lastY = 0
+        if #platforms > 0 then
+            -- Encontrar la plataforma más baja
+            for _, platform in ipairs(platforms) do
+                if platform.y > lastY then
+                    lastY = platform.y
+                end
+            end
+        else
+            lastY = screenHeight - 100
+        end
+        
+        -- Añadir una nueva plataforma si no hay suficientes
+        if lastY < screenHeight then
+            createPlatform(screenHeight)
+        end
+    end
 end
 
 -- Dibujar elementos del juego
@@ -112,8 +149,18 @@ function love.draw()
     love.graphics.setBackgroundColor(0.1, 0.1, 0.1)
     
     -- Dibujar plataformas
-    love.graphics.setColor(0.2, 0.7, 0.3)
     for _, platform in ipairs(platforms) do
+        -- Plataformas normales son verdes
+        if platform.type == "normal" then
+            love.graphics.setColor(0.2, 0.7, 0.3)
+        -- Plataformas especiales son azules
+        elseif platform.type == "special" then
+            love.graphics.setColor(0.2, 0.3, 0.7)
+        -- Plataformas en movimiento son rojas
+        elseif platform.type == "moving" then
+            love.graphics.setColor(0.7, 0.3, 0.2)
+        end
+        
         love.graphics.rectangle("fill", platform.x, platform.y, platform.width, platform.height)
     end
     
@@ -160,12 +207,30 @@ end
 
 -- Crear una nueva plataforma
 function createPlatform(y)
+    local screenWidth = love.graphics.getWidth()
+    local platformTypes = {"normal", "normal", "normal", "special", "moving"}
+    local platformType = platformTypes[love.math.random(1, #platformTypes)]
+    
     local platform = {
-        x = love.math.random(0, love.graphics.getWidth() - 100),
+        x = love.math.random(0, screenWidth - 100),
         y = y,
         width = love.math.random(70, 150),
-        height = 20
+        height = 20,
+        type = platformType,
+        moveDir = love.math.random(0, 1) == 0 and -1 or 1,
+        moveSpeed = love.math.random(30, 70)
     }
+    
+    -- Ajustar propiedades específicas del tipo
+    if platform.type == "special" then
+        -- Las plataformas especiales son más cortas
+        platform.width = platform.width * 0.7
+    elseif platform.type == "moving" then
+        -- Las plataformas en movimiento necesitan más propiedades
+        platform.originalX = platform.x
+        platform.moveRange = love.math.random(30, 80)
+    end
+    
     table.insert(platforms, platform)
 end
 
