@@ -12,6 +12,13 @@ Este juego es una recreación del clásico "Rapid Roll" que estaba presente en l
 - Sistema de puntuación
 - Dificultad progresiva - El juego se acelera conforme aumenta la puntuación
 - Controles simples e intuitivos
+- Diferentes tipos de plataformas para añadir variedad y desafío
+
+## Tipos de plataformas
+
+- **Plataformas normales (verdes)**: Plataformas estándar que proporcionan una base estable.
+- **Plataformas especiales (azules)**: Más pequeñas que las normales, lo que las hace más difíciles de aterrizar.
+- **Plataformas en movimiento (rojas)**: Se mueven horizontalmente, lo que supone un desafío adicional al intentar mantenerse sobre ellas.
 
 ## Requisitos
 
