@@ -33,7 +33,7 @@ end
 -- Actualizar estado del juego
 function love.update(dt)
     if gameOver then
-        if love.keyboard.isPressed('r') then
+        if love.keyboard.isDown('r') then
             resetGame()
         end
         return
