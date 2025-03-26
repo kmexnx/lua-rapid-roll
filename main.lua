@@ -68,6 +68,37 @@ function love.update(dt)
     for i, platform in ipairs(platforms) do
         platform.y = platform.y - platformSpeed * adjustedDt
         
+        -- Mover plataformas horizontalmente si son de tipo "moving"
+        if platform.type == "moving" then
+            -- Actualizar la posición X basada en la dirección y velocidad
+            platform.x = platform.x + (platform.moveDir * platform.moveSpeed * adjustedDt)
+            
+            -- Comprobar límites y cambiar dirección si es necesario
+            local minX = platform.originalX - platform.moveRange
+            local maxX = platform.originalX + platform.moveRange
+            
+            if platform.x < minX then
+                platform.x = minX
+                platform.moveDir = 1  -- Cambiar dirección a derecha
+            elseif platform.x > maxX then
+                platform.x = maxX
+                platform.moveDir = -1 -- Cambiar dirección a izquierda
+            end
+            
+            -- Si el jugador está en esta plataforma, moverlo también
+            if not player.falling and player.y + player.height == platform.y then
+                -- Ajustar posición del jugador con la plataforma
+                player.x = player.x + (platform.moveDir * platform.moveSpeed * adjustedDt)
+                
+                -- Asegurarse de que el jugador no se salga de la pantalla
+                if player.x < 0 then
+                    player.x = 0
+                elseif player.x > love.graphics.getWidth() - player.width then
+                    player.x = love.graphics.getWidth() - player.width
+                end
+            end
+        end
+        
         -- Marcar plataformas que salen de la pantalla para eliminarlas
         if platform.y + platform.height < 0 then
             table.insert(platformsToRemove, i)
