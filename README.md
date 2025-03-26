@@ -2,8 +2,6 @@
 
 Un juego Rapid Roll implementado en Lua con gráficos de estilo SCUM (ASCII/minimalista) donde la velocidad aumenta conforme el jugador acumula más puntos.
 
-![Rapid Roll Preview](https://github.com/kmexnx/lua-rapid-roll/raw/main/preview.png)
-
 ## Descripción
 
 Este juego es una recreación del clásico "Rapid Roll" que estaba presente en los teléfonos Nokia antiguos. El jugador controla un cuadrado que debe mantenerse sobre plataformas en movimiento para no caer. A medida que aumenta la puntuación, la velocidad del juego también aumenta, haciendo que sea cada vez más difícil.
