@@ -1,20 +1,24 @@
 -- Rapid Roll - Monkey Island Edition
 -- Autor: Claude
 
--- Variables globales
-local player = {
-    x = 0,
-    y = 0,
-    width = 50,
-    height = 60,
-    speed = 300,
-    falling = true,
-    direction = "right", -- Dirección hacia la que mira el jugador
-    animTimer = 0,       -- Temporizador para animación
-    animFrame = 1,       -- Cuadro actual de animación
-    isMoving = false     -- Si el jugador está moviéndose
-}
+-- Función para crear un jugador nuevo
+function createPlayer()
+    return {
+        x = love.graphics.getWidth() and love.graphics.getWidth() / 2 - 25 or 240,
+        y = 100,
+        width = 50,
+        height = 60,
+        speed = 300,
+        falling = true,
+        direction = "right", -- Dirección hacia la que mira el jugador
+        animTimer = 0,       -- Temporizador para animación
+        animFrame = 1,       -- Cuadro actual de animación
+        isMoving = false     -- Si el jugador está moviéndose
+    }
+end
 
+-- Variables globales
+local player = createPlayer()
 local platforms = {}
 local score = 0
 local gameOver = false
@@ -51,7 +55,7 @@ end
 -- Comprobar colisión entre jugador y plataforma
 function checkPlatformCollision(a, b)
     -- Solo detecta colisión cuando el jugador está cayendo y su base está por encima de la plataforma
-    return a.falling and
+    return a and a.falling and
            a.x < b.x + b.width and
            a.x + a.width > b.x and
            a.y + a.height >= b.y and
@@ -64,6 +68,11 @@ function love.load()
     love.window.setTitle("Monkey Roll - A Pirate Adventure")
     love.window.setMode(480, 720)
     
+    -- Asegurarse de que player existe
+    if not player then
+        player = createPlayer()
+    end
+    
     -- Cargar imágenes
     loadImages()
     
@@ -71,8 +80,10 @@ function love.load()
     loadSounds()
     
     -- Inicializar posición del jugador
-    player.x = love.graphics.getWidth() / 2 - player.width / 2
-    player.y = 100
+    if player then
+        player.x = love.graphics.getWidth() / 2 - player.width / 2
+        player.y = 100
+    end
     
     -- Inicializar plataformas
     resetGame()
@@ -125,6 +136,13 @@ end
 
 -- Actualizar estado del juego
 function love.update(dt)
+    -- Asegurarse de que player existe
+    if not player then
+        player = createPlayer()
+        resetGame()
+        return
+    end
+
     if gameOver then
         if love.keyboard.isDown('r') then
             resetGame()
@@ -197,7 +215,7 @@ function love.update(dt)
             end
             
             -- Si el jugador está en esta plataforma, moverlo también
-            if not player.falling and player.y + player.height <= platform.y + 10 and player.y + player.height >= platform.y - 10 then
+            if player and not player.falling and player.y + player.height <= platform.y + 10 and player.y + player.height >= platform.y - 10 then
                 -- Ajustar posición del jugador con la plataforma
                 player.x = player.x + (platform.moveDir * platform.moveSpeed * adjustedDt)
                 
@@ -211,7 +229,7 @@ function love.update(dt)
         end
         
         -- Verificar colisión con ítems
-        if platform.hasItem and not platform.itemCollected then
+        if player and platform.hasItem and not platform.itemCollected then
             local itemX = platform.x + platform.width/2 - 15
             local itemY = platform.y - 30
             
@@ -253,19 +271,21 @@ function love.update(dt)
     end
     
     -- Comprobar colisiones entre jugador y plataformas
-    player.falling = true
-    for _, platform in ipairs(platforms) do
-        if checkPlatformCollision(player, platform) then
-            player.falling = false
-            player.y = platform.y - player.height
-            if sounds.jump and player.isMoving then
-                sounds.jump:play()
+    if player then
+        player.falling = true
+        for _, platform in ipairs(platforms) do
+            if checkPlatformCollision(player, platform) then
+                player.falling = false
+                player.y = platform.y - player.height
+                if sounds.jump and player.isMoving then
+                    sounds.jump:play()
+                end
             end
         end
     end
     
     -- Comprobar si el jugador ha caído fuera de la pantalla
-    if player.y > love.graphics.getHeight() then
+    if player and player.y > love.graphics.getHeight() then
         gameOver = true
         if sounds.splash then
             sounds.splash:play()
@@ -276,7 +296,7 @@ function love.update(dt)
     end
     
     -- Comprobar si el jugador ha subido demasiado
-    if player.y < 0 then
+    if player and player.y < 0 then
         player.y = 0
     end
     
@@ -313,24 +333,7 @@ end
 function love.draw()
     -- Verificar que player existe
     if not player then
-        -- Reiniciar el juego si player es nil
-        player = {
-            x = 0,
-            y = 0,
-            width = 50,
-            height = 60,
-            speed = 300,
-            falling = true,
-            direction = "right",
-            animTimer = 0,
-            animFrame = 1,
-            isMoving = false
-        }
-        
-        -- Inicializar posición del jugador
-        player.x = love.graphics.getWidth() / 2 - player.width / 2
-        player.y = 100
-        
+        player = createPlayer()
         resetGame()
         return
     end
@@ -344,6 +347,9 @@ function love.draw()
     else
         love.graphics.setBackgroundColor(0.2, 0.4, 0.8) -- Color azul océano
     end
+    
+    -- Asegurarnos que player existe antes de intentar dibujar plataformas
+    if not player then return end
     
     -- Dibujar plataformas
     for _, platform in ipairs(platforms) do
@@ -391,9 +397,16 @@ function love.draw()
         end
     end
     
+    -- Asegurarnos que player existe antes de intentar dibujarlo
+    if not player then return end
+    
     -- Dibujar jugador
     love.graphics.setColor(1, 1, 1)
-    local playerSprite = player.direction == "right" and sprites.player.right or sprites.player.left
+    local playerSprite = nil
+    if player.direction and sprites.player then
+        playerSprite = player.direction == "right" and sprites.player.right or sprites.player.left
+    end
+    
     if playerSprite then
         local scaleX = player.width / playerSprite:getWidth()
         local scaleY = player.height / playerSprite:getHeight()
@@ -467,6 +480,11 @@ function resetGame()
     score = 0
     gameOver = false
     gameSpeed = 1.0
+    
+    -- Asegurarse de que player existe
+    if not player then
+        player = createPlayer()
+    end
     
     -- Inicializar plataformas
     platforms = {}
