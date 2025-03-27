@@ -1,6 +1,12 @@
 -- Rapid Roll - Monkey Island Edition
 -- Autor: Claude
 
+-- Bandera para determinar si estamos ejecutando en web
+local isWeb = false
+pcall(function()
+    isWeb = love.system.getOS() == "Web"
+end)
+
 -- Función para crear un jugador nuevo
 function createPlayer()
     return {
@@ -68,6 +74,22 @@ function love.load()
     love.window.setTitle("Monkey Roll - A Pirate Adventure")
     love.window.setMode(480, 720)
     
+    -- Imprimir información sobre archivos disponibles (solo en web)
+    if isWeb then
+        print("Ejecutando en entorno web")
+        local files = love.filesystem.getDirectoryItems("")
+        print("Archivos disponibles:")
+        for _, file in ipairs(files) do
+            print(" - " .. file)
+            if love.filesystem.getInfo(file, "directory") then
+                local subfiles = love.filesystem.getDirectoryItems(file)
+                for _, subfile in ipairs(subfiles) do
+                    print("   * " .. file .. "/" .. subfile)
+                end
+            end
+        end
+    end
+    
     -- Asegurarse de que player existe
     if not player then
         player = createPlayer()
@@ -95,30 +117,38 @@ function love.load()
     end
 end
 
--- Cargar imágenes
+-- Cargar imágenes con manejo mejorado para entorno web
 function loadImages()
-    -- Intentamos cargar las imágenes si existen, si no, usamos formas básicas
+    -- Intentamos cargar las imágenes con diferentes rutas
     pcall(function()
-        -- Imágenes del jugador (Guybrush)
+        -- Función para intentar múltiples rutas
+        local function tryLoadImage(paths)
+            for _, path in ipairs(paths) do
+                local success, image = pcall(love.graphics.newImage, path)
+                if success then
+                    return image
+                end
+            end
+            return nil -- Ninguna ruta funcionó
+        end
+        
+        -- Rutas alternativas para cada imagen
         sprites.player = {
-            right = love.graphics.newImage("images/guybrush_right.png"),
-            left = love.graphics.newImage("images/guybrush_left.png")
+            right = tryLoadImage({"images/guybrush_right.png", "guybrush_right.png", "/guybrush_right.png"}),
+            left = tryLoadImage({"images/guybrush_left.png", "guybrush_left.png", "/guybrush_left.png"})
         }
         
-        -- Imágenes de plataformas
         sprites.platforms = {
-            normal = love.graphics.newImage("images/plank.png"),
-            special = love.graphics.newImage("images/barrel.png"),
-            moving = love.graphics.newImage("images/rowboat.png")
+            normal = tryLoadImage({"images/plank.png", "plank.png", "/plank.png"}),
+            special = tryLoadImage({"images/barrel.png", "barrel.png", "/barrel.png"}),
+            moving = tryLoadImage({"images/rowboat.png", "rowboat.png", "/rowboat.png"})
         }
         
-        -- Fondo
-        sprites.background = love.graphics.newImage("images/sea_background.png")
+        sprites.background = tryLoadImage({"images/sea_background.png", "sea_background.png", "/sea_background.png"})
         
-        -- Ítems
         sprites.items = {
-            coin = love.graphics.newImage("images/coin.png"),
-            skull = love.graphics.newImage("images/skull.png")
+            coin = tryLoadImage({"images/coin.png", "coin.png", "/coin.png"}),
+            skull = tryLoadImage({"images/skull.png", "skull.png", "/skull.png"})
         }
     end)
 end
@@ -126,11 +156,22 @@ end
 -- Cargar sonidos
 function loadSounds()
     pcall(function()
-        sounds.jump = love.audio.newSource("sounds/jump.wav", "static")
-        sounds.splash = love.audio.newSource("sounds/splash.wav", "static")
-        sounds.coin = love.audio.newSource("sounds/coin.wav", "static")
-        sounds.gameOver = love.audio.newSource("sounds/gameover.wav", "static")
-        sounds.music = love.audio.newSource("sounds/pirate_theme.mp3", "stream")
+        -- Función para intentar múltiples rutas
+        local function tryLoadSound(paths, type)
+            for _, path in ipairs(paths) do
+                local success, sound = pcall(love.audio.newSource, path, type)
+                if success then
+                    return sound
+                end
+            end
+            return nil -- Ninguna ruta funcionó
+        end
+        
+        sounds.jump = tryLoadSound({"sounds/jump.wav", "jump.wav", "/jump.wav"}, "static")
+        sounds.splash = tryLoadSound({"sounds/splash.wav", "splash.wav", "/splash.wav"}, "static")
+        sounds.coin = tryLoadSound({"sounds/coin.wav", "coin.wav", "/coin.wav"}, "static")
+        sounds.gameOver = tryLoadSound({"sounds/gameover.wav", "gameover.wav", "/gameover.wav"}, "static")
+        sounds.music = tryLoadSound({"sounds/pirate_theme.mp3", "pirate_theme.mp3", "/pirate_theme.mp3"}, "stream")
     end)
 end
 
@@ -471,6 +512,15 @@ function love.draw()
         love.graphics.setColor(0.1, 0.1, 0.1)
         love.graphics.printf("¡Camina la plancha, pirata!\nConseguiste " .. score .. " piezas de oro.\nPresiona 'R' para volver a embarcar.", 
                             70, love.graphics.getHeight() / 2 - 50, love.graphics.getWidth() - 140, "center")
+    end
+    
+    -- Si estamos en web, mostrar mensaje sobre imágenes
+    if isWeb then
+        love.graphics.setColor(1, 1, 1, 0.7)
+        love.graphics.rectangle("fill", 10, love.graphics.getHeight() - 40, love.graphics.getWidth() - 20, 30)
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.printf("Versión web - Fallbacks de gráficos activados", 
+                           15, love.graphics.getHeight() - 35, love.graphics.getWidth() - 30, "center")
     end
 end
 
