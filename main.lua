@@ -1,8 +1,36 @@
 -- Rapid Roll en Lua con LÖVE y gráficos SCUM
 -- Autor: Claude
 
-local sock = require("sock") -- Incluir el módulo de WebSockets
-local json = require("dkjson") -- Para codificar/decodificar mensajes JSON
+-- Intentar cargar las bibliotecas requeridas para multijugador
+local sock, json
+local is_multiplayer_available = true
+
+local function try_load_dependencies()
+    local status_sock, result_sock = pcall(function() return require("sock") end)
+    local status_json, result_json = pcall(function() return require("dkjson") end)
+    
+    if status_sock and status_json then
+        sock = result_sock
+        json = result_json
+        is_multiplayer_available = true
+        print("Módulos para multijugador cargados correctamente")
+        return true
+    else
+        if not status_sock then
+            print("Error al cargar el módulo 'sock': " .. tostring(result_sock))
+            print("El módulo sock.lua debe estar en la misma carpeta que main.lua")
+        end
+        if not status_json then
+            print("Error al cargar el módulo 'dkjson': " .. tostring(result_json))
+            print("Instala dkjson con: luarocks install dkjson")
+        end
+        is_multiplayer_available = false
+        return false
+    end
+end
+
+-- Intentar cargar las dependencias
+try_load_dependencies()
 
 -- Variables globales
 local player = {
@@ -40,6 +68,13 @@ function love.load()
     love.window.setTitle("Rapid Roll - SCUM Edition")
     love.window.setMode(400, 600)
     
+    -- Imprimir información sobre modos disponibles
+    if is_multiplayer_available then
+        print("Modo multijugador disponible. Presiona 'M' para abrir el menú multijugador.")
+    else
+        print("Modo multijugador no disponible. Faltan dependencias.")
+    end
+    
     -- Inicializar posición del jugador
     player.x = love.graphics.getWidth() / 2 - player.width / 2
     player.y = 100
@@ -50,6 +85,12 @@ end
 
 -- Conectar al servidor WebSocket
 function connect_to_server()
+    if not is_multiplayer_available then
+        connection_status = "Error: Faltan dependencias"
+        connection_error = "No se pueden cargar los módulos sock.lua o dkjson"
+        return false
+    end
+    
     if websocket then return end
     
     connection_status = "Conectando..."
@@ -467,8 +508,13 @@ function love.draw()
     end
     
     -- Mostrar instrucciones para el menú multijugador
-    love.graphics.setColor(1, 1, 1, 0.7)
-    love.graphics.print("Presiona 'M' para menú multijugador", 10, love.graphics.getHeight() - 20)
+    if is_multiplayer_available then
+        love.graphics.setColor(1, 1, 1, 0.7)
+        love.graphics.print("Presiona 'M' para menú multijugador", 10, love.graphics.getHeight() - 20)
+    else
+        love.graphics.setColor(1, 0.5, 0.5, 0.7)
+        love.graphics.print("Modo multijugador no disponible - Faltan dependencias", 10, love.graphics.getHeight() - 20)
+    end
 end
 
 -- Dibujar menú de multijugador
@@ -513,7 +559,14 @@ function drawMultiplayerMenu()
     love.graphics.setColor(0.7, 0.7, 0.7)
     love.graphics.printf("Presiona el número correspondiente para seleccionar una opción", 0, 450, love.graphics.getWidth(), "center")
     love.graphics.printf("Presiona 'ESC' para volver al juego", 0, 470, love.graphics.getWidth(), "center")
-}
+    
+    -- Información sobre dependencias
+    if not is_multiplayer_available then
+        love.graphics.setColor(1, 0.5, 0.5)
+        love.graphics.printf("AVISO: Faltan algunas dependencias para el modo multijugador", 0, 510, love.graphics.getWidth(), "center")
+        love.graphics.printf("Instala 'dkjson' y asegúrate de que 'sock.lua' esté en la carpeta del juego", 0, 530, love.graphics.getWidth(), "center")
+    end
+end
 
 -- Reiniciar el juego
 function resetGame()
@@ -532,7 +585,7 @@ function resetGame()
     player.y = 100
     player.x = love.graphics.getWidth() / 2 - player.width / 2
     player.falling = true
-}
+end
 
 -- Crear una nueva plataforma
 function createPlatform(y)
@@ -583,9 +636,10 @@ function love.keypressed(key)
         end
     elseif key == 'r' and gameOver then
         resetGame()
-    elseif key == 'm' then
-        -- Mostrar/ocultar menú multijugador
+    elseif key == 'm' and is_multiplayer_available then
+        -- Mostrar/ocultar menú multijugador solo si están disponibles las dependencias
         show_multiplayer_menu = not show_multiplayer_menu
+        print("Menú multijugador: " .. (show_multiplayer_menu and "Visible" or "Oculto"))
     end
     
     -- Manejo de opciones del menú multijugador
