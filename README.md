@@ -1,34 +1,29 @@
-# Rapid Roll - SCUM Edition
+# Monkey Roll - A Pirate Adventure
 
-Un juego Rapid Roll implementado en Lua con gráficos de estilo SCUM (ASCII/minimalista) donde la velocidad aumenta conforme el jugador acumula más puntos.
+Un juego inspirado en Rapid Roll y Monkey Island, donde controlas a un pirata que debe mantenerse a flote sobre plataformas en movimiento. La velocidad aumenta conforme el jugador acumula más puntos.
 
 ## Descripción
 
-Este juego es una recreación del clásico "Rapid Roll" que estaba presente en los teléfonos Nokia antiguos. El jugador controla un cuadrado que debe mantenerse sobre plataformas en movimiento para no caer. A medida que aumenta la puntuación, la velocidad del juego también aumenta, haciendo que sea cada vez más difícil.
+Este juego es una reimaginación del clásico "Rapid Roll" con un tema inspirado en "The Secret of Monkey Island" de LucasArts. El jugador controla a un pirata que debe mantenerse sobre tablas, barriles y botes flotantes para no caer al agua. A medida que aumenta la puntuación, la velocidad del juego también aumenta, haciendo que sea cada vez más difícil.
 
 ## Características
 
-- Gráficos minimalistas de estilo SCUM (ASCII art en tiempo real)
-- Sistema de puntuación
+- Gráficos con estilo pirata inspirados en Monkey Island
+- Sistema de puntuación con piezas de oro
 - Dificultad progresiva - El juego se acelera conforme aumenta la puntuación
 - Controles simples e intuitivos
-- Diferentes tipos de plataformas para añadir variedad y desafío
-- **¡NUEVO!** Modo multijugador a través de WebSockets
-
-## Tipos de plataformas
-
-- **Plataformas normales (verdes)**: Plataformas estándar que proporcionan una base estable.
-- **Plataformas especiales (azules)**: Más pequeñas que las normales, lo que las hace más difíciles de aterrizar.
-- **Plataformas en movimiento (rojas)**: Se mueven horizontalmente, lo que supone un desafío adicional al intentar mantenerse sobre ellas.
+- Diferentes tipos de plataformas flotantes:
+  - Tablas de madera (normales)
+  - Barriles (especiales, más pequeños)
+  - Botes (en movimiento horizontal)
+- Coleccionables: monedas de oro y calaveras
+- Efectos de sonido y música temática (si se agregan los archivos de audio)
 
 ## Requisitos
 
 Para ejecutar este juego, necesitarás:
 
 1. [LÖVE2D](https://love2d.org/) (versión 11.3 recomendada)
-2. Para el modo multijugador, también necesitarás:
-   - [dkjson](https://github.com/LuaDist/dkjson) - Biblioteca JSON para Lua (`luarocks install dkjson`)
-   - [luasocket](https://github.com/diegonehab/luasocket) - Biblioteca de sockets para Lua (`luarocks install luasocket`)
 
 ## Instalación
 
@@ -47,9 +42,7 @@ cd lua-rapid-roll
 
 ## Cómo ejecutar el juego
 
-### Modo de un jugador
-
-#### En Windows
+### En Windows
 
 1. Instala LÖVE2D desde [love2d.org](https://love2d.org/)
 2. Arrastra la carpeta del juego al ejecutable `love.exe` o
@@ -58,7 +51,7 @@ cd lua-rapid-roll
    "C:\Program Files\LOVE\love.exe" ruta\a\la\carpeta\lua-rapid-roll
    ```
 
-#### En macOS
+### En macOS
 
 1. Instala LÖVE2D desde [love2d.org](https://love2d.org/)
 2. Desde la terminal:
@@ -66,7 +59,7 @@ cd lua-rapid-roll
    /Applications/love.app/Contents/MacOS/love ruta/a/la/carpeta/lua-rapid-roll
    ```
 
-#### En Linux
+### En Linux
 
 1. Instala LÖVE2D desde tu gestor de paquetes o desde [love2d.org](https://love2d.org/)
 2. Desde la terminal:
@@ -74,61 +67,70 @@ cd lua-rapid-roll
    love ruta/a/la/carpeta/lua-rapid-roll
    ```
 
-### Modo multijugador
-
-Para el modo multijugador, primero debes iniciar el servidor:
-
-```bash
-# Ejecutar el servidor
-love ruta/a/la/carpeta/lua-rapid-roll/server
-```
-
-Luego, los jugadores pueden conectarse ejecutando el juego normalmente y presionando 'M' para abrir el menú multijugador. Desde allí, selecciona "Conectar al servidor".
-
 ## Controles
 
-- **Flecha Izquierda** o **A**: Mover jugador a la izquierda
-- **Flecha Derecha** o **D**: Mover jugador a la derecha
+- **Flecha Izquierda** o **A**: Mover pirata a la izquierda
+- **Flecha Derecha** o **D**: Mover pirata a la derecha
 - **R**: Reiniciar juego después de perder
-- **M**: Abrir/cerrar el menú multijugador
-- **Escape**: Salir del juego (o cerrar el menú multijugador)
+- **Escape**: Salir del juego
 
 ## Reglas del juego
 
-1. Controla el cuadrado (jugador) y evita caer fuera de la pantalla
-2. Mantente sobre las plataformas en movimiento
-3. Por cada plataforma que sale de la pantalla, ganas 1 punto
-4. Cada 10 puntos, la velocidad del juego aumenta
-5. ¡El juego termina cuando caes fuera de la pantalla!
+1. Controla al pirata y evita caer al agua
+2. Mantente sobre las plataformas flotantes
+3. Por cada plataforma que sale de la pantalla, ganas 1 pieza de oro
+4. Recoge monedas de oro para obtener 5 piezas extra
+5. Cada 10 piezas, la velocidad del juego aumenta
+6. ¡El juego termina cuando caes al agua!
 
-## Modo Multijugador
+## Personalización
 
-El modo multijugador te permite jugar con amigos en la misma red o a través de Internet (si configurar el servidor adecuadamente). Características:
+El juego puede personalizarse añadiendo imágenes y sonidos propios:
 
-- Ver a otros jugadores en tiempo real
-- Comparar puntuaciones en una tabla de clasificación
-- Recibir notificaciones cuando otros jugadores se unen o pierden
-- Personalizar la conexión con diferentes servidores y puertos
+### Imágenes
+Coloca los siguientes archivos en el directorio `images/`:
+- `guybrush_right.png` y `guybrush_left.png`: Sprites del pirata
+- `plank.png`, `barrel.png`, `rowboat.png`: Sprites de plataformas
+- `sea_background.png`: Fondo del océano
+- `coin.png` y `skull.png`: Coleccionables
 
-Para configurar un servidor accesible desde Internet, necesitarás configurar el reenvío de puertos en tu router o usar un servicio de túnel como ngrok.
+### Sonidos
+Coloca los siguientes archivos en el directorio `sounds/`:
+- `jump.wav`: Sonido al saltar sobre una plataforma
+- `splash.wav`: Sonido al caer al agua
+- `coin.wav`: Sonido al recoger una moneda
+- `gameover.wav`: Melodía de fin de juego
+- `pirate_theme.mp3`: Música de fondo
+
+Si no se encuentran estos archivos, el juego utilizará gráficos simples basados en formas geométricas con temática pirata.
 
 ## Estructura del proyecto
 
 ```
 lua-rapid-roll/
 ├── main.lua          # Archivo principal del juego
-├── conf.lua          # Configuración del juego principal
-├── sock.lua          # Biblioteca WebSocket
-├── server/           # Directorio del servidor multijugador
-│   ├── main.lua      # Código del servidor WebSocket
-│   └── conf.lua      # Configuración del servidor
+├── conf.lua          # Configuración del juego
+├── images/           # Directorio para sprites y gráficos
+│   └── README.txt    # Información sobre los archivos de imagen necesarios
+├── sounds/           # Directorio para efectos de sonido y música
+│   └── README.txt    # Información sobre los archivos de sonido necesarios
 ├── LICENSE           # Archivo de licencia MIT
 └── README.md         # Este archivo
 ```
 
+## Notas sobre la inspiración en SCUMM/Monkey Island
+
+Este juego es un homenaje a las aventuras gráficas clásicas desarrolladas con el motor SCUMM (Script Creation Utility for Maniac Mansion) de LucasArts, particularmente a "The Secret of Monkey Island". Mientras que el gameplay sigue siendo el de un juego de acción vertical, los elementos visuales, personajes y la estética general se inspiran en el universo pirata de Monkey Island.
+
+Si te gusta este juego y quieres experimentar las auténticas aventuras gráficas SCUMM, te recomendamos:
+- Probar los juegos originales de Monkey Island a través de [ScummVM](https://www.scummvm.org/)
+- Explorar otros títulos clásicos de LucasArts como Day of the Tentacle, Sam & Max Hit the Road o Full Throttle
+
 ## Créditos
 
-Desarrollado con LÖVE2D [https://love2d.org/](https://love2d.org/)
+- Desarrollado con LÖVE2D [https://love2d.org/](https://love2d.org/)
+- Inspirado en The Secret of Monkey Island de LucasArts
+- Mecánica basada en el clásico juego Rapid Roll
 
 ## Licencia
 
