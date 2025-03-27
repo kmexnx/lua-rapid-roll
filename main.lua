@@ -1,6 +1,9 @@
 -- Rapid Roll - Monkey Island Edition
 -- Autor: Claude
 
+-- No necesitamos sock.lua ni dkjson para la versión sin multijugador
+-- Biblioteca dkjson ahora incluida localmente en el proyecto
+
 -- Variables globales
 local player = {
     x = 0,
