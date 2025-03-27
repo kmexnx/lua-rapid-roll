@@ -2,7 +2,7 @@
 -- Autor: Claude
 
 local sock = require("sock") -- Incluir el módulo de WebSockets
-local json = require("dkjson") -- Para codificar/decodificar mensajes JSON
+-- local json = require("dkjson") -- Para codificar/decodificar mensajes JSON
 
 -- Variables globales
 local player = {
@@ -513,7 +513,7 @@ function drawMultiplayerMenu()
     love.graphics.setColor(0.7, 0.7, 0.7)
     love.graphics.printf("Presiona el número correspondiente para seleccionar una opción", 0, 450, love.graphics.getWidth(), "center")
     love.graphics.printf("Presiona 'ESC' para volver al juego", 0, 470, love.graphics.getWidth(), "center")
-}
+end
 
 -- Reiniciar el juego
 function resetGame()
@@ -532,7 +532,9 @@ function resetGame()
     player.y = 100
     player.x = love.graphics.getWidth() / 2 - player.width / 2
     player.falling = true
-}
+end
+    player.falling = true
+
 
 -- Crear una nueva plataforma
 function createPlatform(y)
