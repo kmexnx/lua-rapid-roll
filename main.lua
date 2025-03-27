@@ -40,6 +40,24 @@ local sounds = {
     music = nil
 }
 
+-- Verificar colisión entre rectángulos
+function checkRectCollision(x1, y1, w1, h1, x2, y2, w2, h2)
+    return x1 < x2 + w2 and
+           x1 + w1 > x2 and
+           y1 < y2 + h2 and
+           y1 + h1 > y2
+end
+
+-- Comprobar colisión entre jugador y plataforma
+function checkPlatformCollision(a, b)
+    -- Solo detecta colisión cuando el jugador está cayendo y su base está por encima de la plataforma
+    return a.falling and
+           a.x < b.x + b.width and
+           a.x + a.width > b.x and
+           a.y + a.height >= b.y and
+           a.y + a.height <= b.y + b.height / 2
+end
+
 -- Configuración inicial
 function love.load()
     -- Configurar la ventana
@@ -266,14 +284,6 @@ function love.update(dt)
     ensurePlatforms()
 end
 
--- Verificar colisión entre rectángulos
-function checkRectCollision(x1, y1, w1, h1, x2, y2, w2, h2)
-    return x1 < x2 + w2 and
-           x1 + w1 > x2 and
-           y1 < y2 + h2 and
-           y1 + h1 > y2
-end
-
 -- Asegurar que siempre haya un mínimo de plataformas
 function ensurePlatforms()
     local minPlatforms = 7
@@ -486,16 +496,6 @@ function createPlatform(y)
     
     table.insert(platforms, platform)
     return platform
-end
-
--- Comprobar colisión entre jugador y plataforma
-function checkPlatformCollision(a, b)
-    -- Solo detecta colisión cuando el jugador está cayendo y su base está por encima de la plataforma
-    return a.falling and
-           a.x < b.x + b.width and
-           a.x + a.width > b.x and
-           a.y + a.height >= b.y and
-           a.y + a.height <= b.y + b.height / 2
 end
 
 -- Manejo de teclas
