@@ -1,45 +1,18 @@
--- Rapid Roll en Lua con LÖVE y gráficos SCUM
+-- Rapid Roll - Monkey Island Edition
 -- Autor: Claude
-
--- Intentar cargar las bibliotecas requeridas para multijugador
-local sock, json
-local is_multiplayer_available = true
-
-local function try_load_dependencies()
-    local status_sock, result_sock = pcall(function() return require("sock") end)
-    local status_json, result_json = pcall(function() return require("dkjson") end)
-    
-    if status_sock and status_json then
-        sock = result_sock
-        json = result_json
-        is_multiplayer_available = true
-        print("Módulos para multijugador cargados correctamente")
-        return true
-    else
-        if not status_sock then
-            print("Error al cargar el módulo 'sock': " .. tostring(result_sock))
-            print("El módulo sock.lua debe estar en la misma carpeta que main.lua")
-        end
-        if not status_json then
-            print("Error al cargar el módulo 'dkjson': " .. tostring(result_json))
-            print("Instala dkjson con: luarocks install dkjson")
-        end
-        is_multiplayer_available = false
-        return false
-    end
-end
-
--- Intentar cargar las dependencias
-try_load_dependencies()
 
 -- Variables globales
 local player = {
     x = 0,
     y = 0,
-    width = 40,
-    height = 40,
+    width = 50,
+    height = 60,
     speed = 300,
-    falling = true
+    falling = true,
+    direction = "right", -- Dirección hacia la que mira el jugador
+    animTimer = 0,       -- Temporizador para animación
+    animFrame = 1,       -- Cuadro actual de animación
+    isMoving = false     -- Si el jugador está moviéndose
 }
 
 local platforms = {}
@@ -48,32 +21,36 @@ local gameOver = false
 local gameSpeed = 1.0 -- Multiplicador de velocidad del juego
 local speedIncreaseRate = 0.1 -- Aumenta la velocidad cada 10 puntos
 local platformsToRemove = {}
+local theme = "monkey"
 
--- Variables para multijugador
-local websocket = nil
-local client_id = nil
-local opponents = {} -- Lista de oponentes
-local leaderboard = {} -- Tabla de clasificación
-local is_multiplayer = false -- Modo multijugador activado/desactivado
-local server_host = "localhost"
-local server_port = 8080
-local update_timer = 0
-local update_interval = 0.1 -- Enviar actualizaciones cada 0.1 segundos
-local connection_status = "Desconectado"
-local connection_error = nil
-local show_multiplayer_menu = false
+-- Imágenes para sprites
+local sprites = {
+    player = nil,
+    platforms = {},
+    background = nil,
+    items = {}
+}
+
+-- Sonidos
+local sounds = {
+    jump = nil,
+    splash = nil,
+    coin = nil,
+    gameOver = nil,
+    music = nil
+}
 
 -- Configuración inicial
 function love.load()
-    love.window.setTitle("Rapid Roll - SCUM Edition")
-    love.window.setMode(400, 600)
+    -- Configurar la ventana
+    love.window.setTitle("Monkey Roll - A Pirate Adventure")
+    love.window.setMode(480, 720)
     
-    -- Imprimir información sobre modos disponibles
-    if is_multiplayer_available then
-        print("Modo multijugador disponible. Presiona 'M' para abrir el menú multijugador.")
-    else
-        print("Modo multijugador no disponible. Faltan dependencias.")
-    end
+    -- Cargar imágenes
+    loadImages()
+    
+    -- Cargar sonidos
+    loadSounds()
     
     -- Inicializar posición del jugador
     player.x = love.graphics.getWidth() / 2 - player.width / 2
@@ -81,175 +58,55 @@ function love.load()
     
     -- Inicializar plataformas
     resetGame()
+    
+    -- Iniciar música de fondo
+    if sounds.music then
+        sounds.music:setLooping(true)
+        sounds.music:play()
+    end
 end
 
--- Conectar al servidor WebSocket
-function connect_to_server()
-    if not is_multiplayer_available then
-        connection_status = "Error: Faltan dependencias"
-        connection_error = "No se pueden cargar los módulos sock.lua o dkjson"
-        return false
-    end
-    
-    if websocket then return end
-    
-    connection_status = "Conectando..."
-    connection_error = nil
-    
-    -- Intentar la conexión
-    local ws, err = sock.connect(server_host, server_port)
-    
-    if not ws then
-        connection_status = "Error de conexión"
-        connection_error = err
-        print("Error al conectar al servidor WebSocket: " .. tostring(err))
-        return false
-    end
-    
-    websocket = ws
-    is_multiplayer = true
-    connection_status = "Conectado"
-    print("Conectado al servidor WebSocket")
-    return true
-end
-
--- Desconectar del servidor WebSocket
-function disconnect_from_server()
-    if not websocket then return end
-    
-    websocket:close()
-    websocket = nil
-    is_multiplayer = false
-    opponents = {}
-    leaderboard = {}
-    client_id = nil
-    connection_status = "Desconectado"
-    print("Desconectado del servidor WebSocket")
-end
-
--- Manejar mensajes del servidor
-function handle_server_messages()
-    if not websocket then return end
-    
-    local message, err = websocket:receive()
-    if err then
-        print("Error al recibir mensaje del servidor: " .. tostring(err))
-        -- Si hay un error, podríamos desconectar e intentar reconectar
-        disconnect_from_server()
-        return
-    end
-    
-    if message then
-        local data = json.decode(message)
-        if not data then
-            print("Error al decodificar mensaje JSON del servidor")
-            return
-        end
+-- Cargar imágenes
+function loadImages()
+    -- Intentamos cargar las imágenes si existen, si no, usamos formas básicas
+    pcall(function()
+        -- Imágenes del jugador (Guybrush)
+        sprites.player = {
+            right = love.graphics.newImage("images/guybrush_right.png"),
+            left = love.graphics.newImage("images/guybrush_left.png")
+        }
         
-        if data.type == "welcome" then
-            -- Mensaje de bienvenida, almacenar nuestro ID
-            client_id = data.client_id
-            print("ID de cliente asignado: " .. client_id)
-            
-            -- Solicitar la tabla de clasificación
-            send_to_server({
-                type = "get_leaderboard"
-            })
-            
-        elseif data.type == "player_update" then
-            -- Actualización de otro jugador
-            local opponent_id = data.client_id
-            
-            -- Actualizar o crear el oponente
-            opponents[opponent_id] = opponents[opponent_id] or {
-                x = data.player_x,
-                y = data.player_y,
-                width = player.width,
-                height = player.height,
-                score = data.score,
-                game_speed = data.game_speed
-            }
-            
-            -- Actualizar la posición y puntuación
-            opponents[opponent_id].x = data.player_x
-            opponents[opponent_id].y = data.player_y
-            opponents[opponent_id].score = data.score
-            opponents[opponent_id].game_speed = data.game_speed
-            
-        elseif data.type == "player_joined" then
-            -- Nuevo jugador unido
-            print("Jugador " .. data.client_id .. " se ha unido")
-            
-        elseif data.type == "player_left" then
-            -- Jugador desconectado
-            print("Jugador " .. data.client_id .. " se ha desconectado")
-            opponents[data.client_id] = nil
-            
-        elseif data.type == "player_game_over" then
-            -- Otro jugador ha perdido
-            print("Jugador " .. data.client_id .. " ha perdido con puntuación " .. data.final_score)
-            
-            -- Actualizar su estado si aún lo tenemos en la lista
-            if opponents[data.client_id] then
-                opponents[data.client_id].game_over = true
-                opponents[data.client_id].final_score = data.final_score
-            end
-            
-        elseif data.type == "leaderboard" then
-            -- Actualizar tabla de clasificación
-            leaderboard = data.leaderboard
-        end
-    end
+        -- Imágenes de plataformas
+        sprites.platforms = {
+            normal = love.graphics.newImage("images/plank.png"),
+            special = love.graphics.newImage("images/barrel.png"),
+            moving = love.graphics.newImage("images/rowboat.png")
+        }
+        
+        -- Fondo
+        sprites.background = love.graphics.newImage("images/sea_background.png")
+        
+        -- Ítems
+        sprites.items = {
+            coin = love.graphics.newImage("images/coin.png"),
+            skull = love.graphics.newImage("images/skull.png")
+        }
+    end)
 end
 
--- Enviar mensaje al servidor
-function send_to_server(message)
-    if not websocket or not is_multiplayer then return end
-    
-    local ok, err = websocket:send(json.encode(message))
-    if not ok then
-        print("Error al enviar mensaje al servidor: " .. tostring(err))
-        disconnect_from_server()
-    end
-end
-
--- Enviar actualización de estado al servidor
-function send_game_update()
-    if not websocket or not is_multiplayer or gameOver then return end
-    
-    send_to_server({
-        type = "update",
-        player_x = player.x,
-        player_y = player.y,
-        score = score,
-        game_speed = gameSpeed
-    })
-end
-
--- Notificar al servidor cuando perdemos
-function send_game_over()
-    if not websocket or not is_multiplayer then return end
-    
-    send_to_server({
-        type = "game_over",
-        score = score
-    })
+-- Cargar sonidos
+function loadSounds()
+    pcall(function()
+        sounds.jump = love.audio.newSource("sounds/jump.wav", "static")
+        sounds.splash = love.audio.newSource("sounds/splash.wav", "static")
+        sounds.coin = love.audio.newSource("sounds/coin.wav", "static")
+        sounds.gameOver = love.audio.newSource("sounds/gameover.wav", "static")
+        sounds.music = love.audio.newSource("sounds/pirate_theme.mp3", "stream")
+    end)
 end
 
 -- Actualizar estado del juego
 function love.update(dt)
-    -- Procesar mensajes del servidor si estamos en modo multijugador
-    if is_multiplayer and websocket then
-        handle_server_messages()
-        
-        -- Enviar actualizaciones periódicamente
-        update_timer = update_timer + dt
-        if update_timer >= update_interval then
-            send_game_update()
-            update_timer = 0
-        end
-    end
-    
     if gameOver then
         if love.keyboard.isDown('r') then
             resetGame()
@@ -257,10 +114,15 @@ function love.update(dt)
         return
     end
     
-    -- No actualizar el juego si estamos en el menú multijugador
-    if show_multiplayer_menu then
-        return
+    -- Actualizar la animación del jugador
+    player.animTimer = player.animTimer + dt
+    if player.animTimer > 0.2 then
+        player.animTimer = 0
+        player.animFrame = player.animFrame % 2 + 1
     end
+    
+    -- Resetear flag de movimiento
+    player.isMoving = false
     
     -- Aplicar el multiplicador de velocidad al deltatime
     local adjustedDt = dt * gameSpeed
@@ -268,9 +130,13 @@ function love.update(dt)
     -- Mover jugador horizontalmente
     if love.keyboard.isDown('left') or love.keyboard.isDown('a') then
         player.x = player.x - player.speed * adjustedDt
+        player.direction = "left"
+        player.isMoving = true
     end
     if love.keyboard.isDown('right') or love.keyboard.isDown('d') then
         player.x = player.x + player.speed * adjustedDt
+        player.direction = "right"
+        player.isMoving = true
     end
     
     -- Limitar el movimiento horizontal del jugador
@@ -290,6 +156,11 @@ function love.update(dt)
     for i, platform in ipairs(platforms) do
         platform.y = platform.y - platformSpeed * adjustedDt
         
+        -- Actualizar elementos especiales de la plataforma
+        if platform.hasItem then
+            platform.itemRotation = platform.itemRotation + dt * 2
+        end
+        
         -- Mover plataformas horizontalmente si son de tipo "moving"
         if platform.type == "moving" then
             -- Actualizar la posición X basada en la dirección y velocidad
@@ -308,7 +179,7 @@ function love.update(dt)
             end
             
             -- Si el jugador está en esta plataforma, moverlo también
-            if not player.falling and player.y + player.height == platform.y then
+            if not player.falling and player.y + player.height <= platform.y + 10 and player.y + player.height >= platform.y - 10 then
                 -- Ajustar posición del jugador con la plataforma
                 player.x = player.x + (platform.moveDir * platform.moveSpeed * adjustedDt)
                 
@@ -317,6 +188,21 @@ function love.update(dt)
                     player.x = 0
                 elseif player.x > love.graphics.getWidth() - player.width then
                     player.x = love.graphics.getWidth() - player.width
+                end
+            end
+        end
+        
+        -- Verificar colisión con ítems
+        if platform.hasItem and not platform.itemCollected then
+            local itemX = platform.x + platform.width/2 - 15
+            local itemY = platform.y - 30
+            
+            if checkRectCollision(player.x, player.y, player.width, player.height, 
+                                   itemX, itemY, 30, 30) then
+                platform.itemCollected = true
+                score = score + 5
+                if sounds.coin then
+                    sounds.coin:play()
                 end
             end
         end
@@ -335,7 +221,7 @@ function love.update(dt)
         score = score + 1
         
         -- Aumentar velocidad del juego cada 10 puntos
-        if score % 10 == 0 then
+        if score % 10 == 0 and score > 0 then
             gameSpeed = gameSpeed + speedIncreaseRate
         end
         
@@ -351,17 +237,23 @@ function love.update(dt)
     -- Comprobar colisiones entre jugador y plataformas
     player.falling = true
     for _, platform in ipairs(platforms) do
-        if checkCollision(player, platform) then
+        if checkPlatformCollision(player, platform) then
             player.falling = false
             player.y = platform.y - player.height
+            if sounds.jump and player.isMoving then
+                sounds.jump:play()
+            end
         end
     end
     
     -- Comprobar si el jugador ha caído fuera de la pantalla
     if player.y > love.graphics.getHeight() then
         gameOver = true
-        if is_multiplayer then
-            send_game_over()
+        if sounds.splash then
+            sounds.splash:play()
+        end
+        if sounds.gameOver then
+            sounds.gameOver:play()
         end
     end
     
@@ -374,9 +266,17 @@ function love.update(dt)
     ensurePlatforms()
 end
 
+-- Verificar colisión entre rectángulos
+function checkRectCollision(x1, y1, w1, h1, x2, y2, w2, h2)
+    return x1 < x2 + w2 and
+           x1 + w1 > x2 and
+           y1 < y2 + h2 and
+           y1 + h1 > y2
+end
+
 -- Asegurar que siempre haya un mínimo de plataformas
 function ensurePlatforms()
-    local minPlatforms = 5
+    local minPlatforms = 7
     local screenHeight = love.graphics.getHeight()
     
     if #platforms < minPlatforms then
@@ -402,169 +302,128 @@ end
 -- Dibujar elementos del juego
 function love.draw()
     -- Dibujar fondo
-    love.graphics.setBackgroundColor(0.1, 0.1, 0.1)
+    if sprites.background then
+        love.graphics.setColor(1, 1, 1)
+        local bgScale = math.max(love.graphics.getWidth() / sprites.background:getWidth(), 
+                                 love.graphics.getHeight() / sprites.background:getHeight())
+        love.graphics.draw(sprites.background, 0, 0, 0, bgScale, bgScale)
+    else
+        love.graphics.setBackgroundColor(0.2, 0.4, 0.8) -- Color azul océano
+    end
     
     -- Dibujar plataformas
     for _, platform in ipairs(platforms) do
-        -- Plataformas normales son verdes
-        if platform.type == "normal" then
-            love.graphics.setColor(0.2, 0.7, 0.3)
-        -- Plataformas especiales son azules
-        elseif platform.type == "special" then
-            love.graphics.setColor(0.2, 0.3, 0.7)
-        -- Plataformas en movimiento son rojas
-        elseif platform.type == "moving" then
-            love.graphics.setColor(0.7, 0.3, 0.2)
+        -- Color según tipo de plataforma (fallback si no hay sprites)
+        if not sprites.platforms[platform.type] then
+            if platform.type == "normal" then
+                love.graphics.setColor(0.6, 0.4, 0.2) -- Marrón para tablas
+            elseif platform.type == "special" then
+                love.graphics.setColor(0.7, 0.6, 0.3) -- Dorado para barriles
+            elseif platform.type == "moving" then
+                love.graphics.setColor(0.5, 0.3, 0.2) -- Marrón oscuro para botes
+            end
+            love.graphics.rectangle("fill", platform.x, platform.y, platform.width, platform.height)
+        else
+            -- Dibujar sprite de plataforma
+            love.graphics.setColor(1, 1, 1)
+            local sprite = sprites.platforms[platform.type]
+            local scaleX = platform.width / sprite:getWidth()
+            local scaleY = platform.height / sprite:getHeight()
+            love.graphics.draw(sprite, platform.x, platform.y, 0, scaleX, scaleY)
         end
         
-        love.graphics.rectangle("fill", platform.x, platform.y, platform.width, platform.height)
-    end
-    
-    -- Dibujar oponentes si estamos en modo multijugador
-    if is_multiplayer then
-        for id, opponent in pairs(opponents) do
-            if id ~= client_id and not opponent.game_over then
-                -- Dibujar oponente con color distintivo (semi-transparente)
-                love.graphics.setColor(0.8, 0.8, 0.8, 0.5)
-                love.graphics.rectangle("fill", opponent.x, opponent.y, opponent.width, opponent.height)
-                
-                -- Dibujar "cara" del oponente
-                love.graphics.setColor(0.2, 0.2, 0.2, 0.7)
-                love.graphics.rectangle("fill", opponent.x + 10, opponent.y + 10, 5, 5) -- Ojo izquierdo
-                love.graphics.rectangle("fill", opponent.x + 25, opponent.y + 10, 5, 5) -- Ojo derecho
-                love.graphics.rectangle("fill", opponent.x + 10, opponent.y + 25, 20, 5) -- Boca
-                
-                -- Mostrar puntuación del oponente sobre su cabeza
-                love.graphics.setColor(1, 1, 1, 0.8)
-                love.graphics.print(tostring(opponent.score), opponent.x, opponent.y - 15)
+        -- Dibujar ítem si la plataforma lo tiene
+        if platform.hasItem and not platform.itemCollected then
+            love.graphics.setColor(1, 1, 1)
+            local itemSprite = platform.itemType == "coin" and sprites.items.coin or sprites.items.skull
+            if itemSprite then
+                love.graphics.draw(itemSprite, 
+                                   platform.x + platform.width/2, 
+                                   platform.y - 20, 
+                                   platform.itemRotation, 
+                                   0.5, 0.5, 
+                                   itemSprite:getWidth()/2, 
+                                   itemSprite:getHeight()/2)
+            else
+                -- Fallback si no hay sprite
+                if platform.itemType == "coin" then
+                    love.graphics.setColor(1, 0.8, 0)
+                    love.graphics.circle("fill", platform.x + platform.width/2, platform.y - 20, 10)
+                else
+                    love.graphics.setColor(0.8, 0.8, 0.8)
+                    love.graphics.circle("fill", platform.x + platform.width/2, platform.y - 20, 10)
+                end
             end
         end
     end
     
-    -- Dibujar jugador (estilo SCUM con caracteres ASCII)
+    -- Dibujar jugador
     love.graphics.setColor(1, 1, 1)
-    love.graphics.rectangle("fill", player.x, player.y, player.width, player.height)
-    
-    -- Dibujar "cara" del jugador estilo SCUM
-    love.graphics.setColor(0, 0, 0)
-    love.graphics.rectangle("fill", player.x + 10, player.y + 10, 5, 5) -- Ojo izquierdo
-    love.graphics.rectangle("fill", player.x + 25, player.y + 10, 5, 5) -- Ojo derecho
-    love.graphics.rectangle("fill", player.x + 10, player.y + 25, 20, 5) -- Boca
-    
-    -- Mostrar puntuación
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.print("Score: " .. score, 10, 10)
-    love.graphics.print("Speed: " .. string.format("%.1f", gameSpeed) .. "x", 10, 30)
-    
-    -- Mostrar información de multijugador
-    if is_multiplayer then
-        love.graphics.print("Multijugador: " .. connection_status, 10, 50)
-        love.graphics.print("ID: " .. (client_id or "N/A"), 10, 70)
+    local playerSprite = player.direction == "right" and sprites.player.right or sprites.player.left
+    if playerSprite then
+        local scaleX = player.width / playerSprite:getWidth()
+        local scaleY = player.height / playerSprite:getHeight()
+        love.graphics.draw(playerSprite, player.x, player.y, 0, scaleX, scaleY)
+    else
+        -- Fallback si no hay sprites - dibujar un jugador estilo pirata simplificado
+        -- Cuerpo
+        love.graphics.setColor(0.6, 0.1, 0.1) -- Rojo para el cuerpo
+        love.graphics.rectangle("fill", player.x, player.y, player.width, player.height)
         
-        -- Mostrar tabla de clasificación
-        love.graphics.print("Clasificación:", 10, 100)
-        local yPos = 120
-        local playersShown = 0
+        -- Cara
+        love.graphics.setColor(0.9, 0.8, 0.5) -- Color piel
+        love.graphics.rectangle("fill", player.x + 10, player.y + 5, player.width - 20, 20)
         
-        -- Ordenar jugadores por puntuación
-        local sortedPlayers = {}
-        
-        -- Añadir jugador actual
-        table.insert(sortedPlayers, {
-            id = "Tú",
-            score = score
-        })
-        
-        -- Añadir oponentes
-        for id, opponent in pairs(opponents) do
-            table.insert(sortedPlayers, {
-                id = "Jugador " .. id,
-                score = opponent.score
-            })
+        -- Ojos
+        love.graphics.setColor(0, 0, 0)
+        if player.direction == "right" then
+            love.graphics.rectangle("fill", player.x + player.width - 20, player.y + 10, 5, 5)
+            -- Parche de pirata
+            love.graphics.rectangle("fill", player.x + 15, player.y + 8, 12, 10)
+        else
+            love.graphics.rectangle("fill", player.x + 15, player.y + 10, 5, 5)
+            -- Parche de pirata
+            love.graphics.rectangle("fill", player.x + player.width - 27, player.y + 8, 12, 10)
         end
         
-        -- Ordenar por puntuación
-        table.sort(sortedPlayers, function(a, b) return a.score > b.score end)
+        -- Boca
+        love.graphics.rectangle("fill", player.x + 20, player.y + 20, 10, 3)
         
-        -- Mostrar top 5
-        for i, player in ipairs(sortedPlayers) do
-            if playersShown < 5 then
-                love.graphics.print(i .. ". " .. player.id .. ": " .. player.score, 20, yPos)
-                yPos = yPos + 20
-                playersShown = playersShown + 1
-            end
-        end
+        -- Sombrero de pirata
+        love.graphics.setColor(0.1, 0.1, 0.3) -- Azul oscuro
+        love.graphics.rectangle("fill", player.x + 5, player.y, player.width - 10, 10)
+        love.graphics.rectangle("fill", player.x + 15, player.y - 5, player.width - 30, 5)
     end
+    
+    -- Mostrar puntuación con estilo de Monkey Island
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.rectangle("fill", 10, 10, 150, 40, 10, 10)
+    love.graphics.setColor(0.6, 0.1, 0.1)
+    love.graphics.rectangle("fill", 15, 15, 140, 30, 5, 5)
+    love.graphics.setColor(1, 0.8, 0)
+    love.graphics.print("Piezas: " .. score, 25, 20, 0, 1.5, 1.5)
+    
+    -- Mostrar velocidad del barco
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.rectangle("fill", love.graphics.getWidth() - 160, 10, 150, 40, 10, 10)
+    love.graphics.setColor(0.1, 0.3, 0.6)
+    love.graphics.rectangle("fill", love.graphics.getWidth() - 155, 15, 140, 30, 5, 5)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.print("Nudos: " .. string.format("%.1f", gameSpeed), love.graphics.getWidth() - 145, 20, 0, 1.5, 1.5)
     
     -- Mensaje de game over
     if gameOver then
-        love.graphics.setColor(1, 0, 0)
-        love.graphics.printf("GAME OVER!\nPress 'R' to restart", 0, love.graphics.getHeight() / 2 - 30, love.graphics.getWidth(), "center")
-    end
-    
-    -- Dibujar menú multijugador si está activo
-    if show_multiplayer_menu then
-        drawMultiplayerMenu()
-    end
-    
-    -- Mostrar instrucciones para el menú multijugador
-    if is_multiplayer_available then
-        love.graphics.setColor(1, 1, 1, 0.7)
-        love.graphics.print("Presiona 'M' para menú multijugador", 10, love.graphics.getHeight() - 20)
-    else
-        love.graphics.setColor(1, 0.5, 0.5, 0.7)
-        love.graphics.print("Modo multijugador no disponible - Faltan dependencias", 10, love.graphics.getHeight() - 20)
-    end
-end
-
--- Dibujar menú de multijugador
-function drawMultiplayerMenu()
-    -- Fondo semitransparente
-    love.graphics.setColor(0, 0, 0, 0.8)
-    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
-    
-    -- Título
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("MENÚ MULTIJUGADOR", 0, 100, love.graphics.getWidth(), "center")
-    
-    -- Mostrar estado de conexión
-    love.graphics.printf("Estado: " .. connection_status, 0, 140, love.graphics.getWidth(), "center")
-    
-    -- Mostrar opciones
-    local yPos = 200
-    local options = {}
-    
-    if not is_multiplayer then
-        options[1] = "1. Conectar al servidor"
-    else
-        options[1] = "1. Desconectar del servidor"
-    end
-    
-    options[2] = "2. Cambiar host: " .. server_host
-    options[3] = "3. Cambiar puerto: " .. server_port
-    options[4] = "4. Volver al juego"
-    
-    for i, option in ipairs(options) do
-        love.graphics.printf(option, 50, yPos, love.graphics.getWidth() - 100, "left")
-        yPos = yPos + 40
-    end
-    
-    -- Mostrar error de conexión si existe
-    if connection_error then
-        love.graphics.setColor(1, 0.3, 0.3)
-        love.graphics.printf("Error: " .. connection_error, 50, 380, love.graphics.getWidth() - 100, "center")
-    end
-    
-    -- Instrucciones
-    love.graphics.setColor(0.7, 0.7, 0.7)
-    love.graphics.printf("Presiona el número correspondiente para seleccionar una opción", 0, 450, love.graphics.getWidth(), "center")
-    love.graphics.printf("Presiona 'ESC' para volver al juego", 0, 470, love.graphics.getWidth(), "center")
-    
-    -- Información sobre dependencias
-    if not is_multiplayer_available then
-        love.graphics.setColor(1, 0.5, 0.5)
-        love.graphics.printf("AVISO: Faltan algunas dependencias para el modo multijugador", 0, 510, love.graphics.getWidth(), "center")
-        love.graphics.printf("Instala 'dkjson' y asegúrate de que 'sock.lua' esté en la carpeta del juego", 0, 530, love.graphics.getWidth(), "center")
+        -- Fondo de pergamino
+        love.graphics.setColor(0.9, 0.85, 0.7)
+        love.graphics.rectangle("fill", 50, love.graphics.getHeight() / 2 - 100, love.graphics.getWidth() - 100, 200, 20, 20)
+        -- Borde del pergamino
+        love.graphics.setColor(0.6, 0.4, 0.2)
+        love.graphics.rectangle("line", 55, love.graphics.getHeight() / 2 - 95, love.graphics.getWidth() - 110, 190, 15, 15)
+        
+        -- Texto de game over
+        love.graphics.setColor(0.1, 0.1, 0.1)
+        love.graphics.printf("¡Camina la plancha, pirata!\nConseguiste " .. score .. " piezas de oro.\nPresiona 'R' para volver a embarcar.", 
+                            70, love.graphics.getHeight() / 2 - 50, love.graphics.getWidth() - 140, "center", 0, 1.5, 1.5)
     end
 end
 
@@ -577,14 +436,20 @@ function resetGame()
     
     -- Inicializar plataformas
     platforms = {}
-    for i = 1, 5 do
-        createPlatform(i * 120)
+    for i = 1, 7 do
+        createPlatform(i * 100)
     end
     
     -- Reiniciar posición del jugador
     player.y = 100
     player.x = love.graphics.getWidth() / 2 - player.width / 2
     player.falling = true
+    
+    -- Reiniciar música si estaba reproduciendo
+    if sounds.music then
+        sounds.music:stop()
+        sounds.music:play()
+    end
 end
 
 -- Crear una nueva plataforma
@@ -593,31 +458,38 @@ function createPlatform(y)
     local platformTypes = {"normal", "normal", "normal", "special", "moving"}
     local platformType = platformTypes[love.math.random(1, #platformTypes)]
     
+    local width = love.math.random(70, 150)
+    if platformType == "special" then
+        width = width * 0.7 -- Plataformas especiales son más pequeñas
+    end
+    
     local platform = {
-        x = love.math.random(0, screenWidth - 100),
+        x = love.math.random(0, screenWidth - width),
         y = y,
-        width = love.math.random(70, 150),
+        width = width,
         height = 20,
         type = platformType,
         moveDir = love.math.random(0, 1) == 0 and -1 or 1,
-        moveSpeed = love.math.random(30, 70)
+        moveSpeed = love.math.random(30, 70),
+        hasItem = love.math.random() > 0.8, -- 20% de probabilidad de tener un ítem
+        itemType = love.math.random() > 0.3 and "coin" or "skull",
+        itemRotation = 0,
+        itemCollected = false
     }
     
     -- Ajustar propiedades específicas del tipo
-    if platform.type == "special" then
-        -- Las plataformas especiales son más cortas
-        platform.width = platform.width * 0.7
-    elseif platform.type == "moving" then
+    if platformType == "moving" then
         -- Las plataformas en movimiento necesitan más propiedades
         platform.originalX = platform.x
         platform.moveRange = love.math.random(30, 80)
     end
     
     table.insert(platforms, platform)
+    return platform
 end
 
 -- Comprobar colisión entre jugador y plataforma
-function checkCollision(a, b)
+function checkPlatformCollision(a, b)
     -- Solo detecta colisión cuando el jugador está cayendo y su base está por encima de la plataforma
     return a.falling and
            a.x < b.x + b.width and
@@ -629,51 +501,8 @@ end
 -- Manejo de teclas
 function love.keypressed(key)
     if key == 'escape' then
-        if show_multiplayer_menu then
-            show_multiplayer_menu = false
-        else
-            love.event.quit()
-        end
+        love.event.quit()
     elseif key == 'r' and gameOver then
         resetGame()
-    elseif key == 'm' and is_multiplayer_available then
-        -- Mostrar/ocultar menú multijugador solo si están disponibles las dependencias
-        show_multiplayer_menu = not show_multiplayer_menu
-        print("Menú multijugador: " .. (show_multiplayer_menu and "Visible" or "Oculto"))
-    end
-    
-    -- Manejo de opciones del menú multijugador
-    if show_multiplayer_menu then
-        if key == '1' then
-            if not is_multiplayer then
-                connect_to_server()
-            else
-                disconnect_from_server()
-            end
-        elseif key == '2' then
-            -- Cambiar host (solo para demo, en una implementación real debería usar un input de texto)
-            local hosts = {"localhost", "127.0.0.1", "ws.example.com"}
-            local currentIndex = 1
-            for i, host in ipairs(hosts) do
-                if host == server_host then
-                    currentIndex = i
-                    break
-                end
-            end
-            server_host = hosts[(currentIndex % #hosts) + 1]
-        elseif key == '3' then
-            -- Cambiar puerto (solo para demo)
-            local ports = {8080, 8081, 8082, 9000}
-            local currentIndex = 1
-            for i, port in ipairs(ports) do
-                if port == server_port then
-                    currentIndex = i
-                    break
-                end
-            end
-            server_port = ports[(currentIndex % #ports) + 1]
-        elseif key == '4' then
-            show_multiplayer_menu = false
-        end
     end
 end
