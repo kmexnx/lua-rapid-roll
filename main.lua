@@ -1,9 +1,6 @@
 -- Rapid Roll - Monkey Island Edition
 -- Autor: Claude
 
--- No necesitamos sock.lua ni dkjson para la versión sin multijugador
--- Biblioteca dkjson ahora incluida localmente en el proyecto
-
 -- Variables globales
 local player = {
     x = 0,
@@ -426,7 +423,7 @@ function love.draw()
         -- Texto de game over
         love.graphics.setColor(0.1, 0.1, 0.1)
         love.graphics.printf("¡Camina la plancha, pirata!\nConseguiste " .. score .. " piezas de oro.\nPresiona 'R' para volver a embarcar.", 
-                            70, love.graphics.getHeight() / 2 - 50, love.graphics.getWidth() - 140, "center", 0, 1.5, 1.5)
+                            70, love.graphics.getHeight() / 2 - 50, love.graphics.getWidth() - 140, "center")
     end
 end
 
