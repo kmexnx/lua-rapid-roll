@@ -79,7 +79,8 @@ cd lua-rapid-roll
 Para el modo multijugador, primero debes iniciar el servidor:
 
 ```bash
-love ruta/a/la/carpeta/lua-rapid-roll/server.lua
+# Ejecutar el servidor
+love ruta/a/la/carpeta/lua-rapid-roll/server
 ```
 
 Luego, los jugadores pueden conectarse ejecutando el juego normalmente y presionando 'M' para abrir el menú multijugador. Desde allí, selecciona "Conectar al servidor".
@@ -110,6 +111,20 @@ El modo multijugador te permite jugar con amigos en la misma red o a través de 
 - Personalizar la conexión con diferentes servidores y puertos
 
 Para configurar un servidor accesible desde Internet, necesitarás configurar el reenvío de puertos en tu router o usar un servicio de túnel como ngrok.
+
+## Estructura del proyecto
+
+```
+lua-rapid-roll/
+├── main.lua          # Archivo principal del juego
+├── conf.lua          # Configuración del juego principal
+├── sock.lua          # Biblioteca WebSocket
+├── server/           # Directorio del servidor multijugador
+│   ├── main.lua      # Código del servidor WebSocket
+│   └── conf.lua      # Configuración del servidor
+├── LICENSE           # Archivo de licencia MIT
+└── README.md         # Este archivo
+```
 
 ## Créditos
 
