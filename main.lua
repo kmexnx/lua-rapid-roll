@@ -1,12 +1,6 @@
 -- Rapid Roll - Monkey Island Edition
 -- Autor: Claude
 
--- Bandera para determinar si estamos ejecutando en web
-local isWeb = false
-pcall(function()
-    isWeb = love.system.getOS() == "Web"
-end)
-
 -- Función para crear un jugador nuevo
 function createPlayer()
     return {
@@ -33,23 +27,6 @@ local speedIncreaseRate = 0.1 -- Aumenta la velocidad cada 10 puntos
 local platformsToRemove = {}
 local theme = "monkey"
 
--- Imágenes para sprites
-local sprites = {
-    player = nil,
-    platforms = {},
-    background = nil,
-    items = {}
-}
-
--- Sonidos
-local sounds = {
-    jump = nil,
-    splash = nil,
-    coin = nil,
-    gameOver = nil,
-    music = nil
-}
-
 -- Verificar colisión entre rectángulos
 function checkRectCollision(x1, y1, w1, h1, x2, y2, w2, h2)
     return x1 < x2 + w2 and
@@ -74,32 +51,10 @@ function love.load()
     love.window.setTitle("Monkey Roll - A Pirate Adventure")
     love.window.setMode(480, 720)
     
-    -- Imprimir información sobre archivos disponibles (solo en web)
-    if isWeb then
-        print("Ejecutando en entorno web")
-        local files = love.filesystem.getDirectoryItems("")
-        print("Archivos disponibles:")
-        for _, file in ipairs(files) do
-            print(" - " .. file)
-            if love.filesystem.getInfo(file, "directory") then
-                local subfiles = love.filesystem.getDirectoryItems(file)
-                for _, subfile in ipairs(subfiles) do
-                    print("   * " .. file .. "/" .. subfile)
-                end
-            end
-        end
-    end
-    
     -- Asegurarse de que player existe
     if not player then
         player = createPlayer()
     end
-    
-    -- Cargar imágenes
-    loadImages()
-    
-    -- Cargar sonidos
-    loadSounds()
     
     -- Inicializar posición del jugador
     if player then
@@ -109,70 +64,6 @@ function love.load()
     
     -- Inicializar plataformas
     resetGame()
-    
-    -- Iniciar música de fondo
-    if sounds.music then
-        sounds.music:setLooping(true)
-        sounds.music:play()
-    end
-end
-
--- Cargar imágenes con manejo mejorado para entorno web
-function loadImages()
-    -- Intentamos cargar las imágenes con diferentes rutas
-    pcall(function()
-        -- Función para intentar múltiples rutas
-        local function tryLoadImage(paths)
-            for _, path in ipairs(paths) do
-                local success, image = pcall(love.graphics.newImage, path)
-                if success then
-                    return image
-                end
-            end
-            return nil -- Ninguna ruta funcionó
-        end
-        
-        -- Rutas alternativas para cada imagen
-        sprites.player = {
-            right = tryLoadImage({"images/guybrush_right.png", "guybrush_right.png", "/guybrush_right.png"}),
-            left = tryLoadImage({"images/guybrush_left.png", "guybrush_left.png", "/guybrush_left.png"})
-        }
-        
-        sprites.platforms = {
-            normal = tryLoadImage({"images/plank.png", "plank.png", "/plank.png"}),
-            special = tryLoadImage({"images/barrel.png", "barrel.png", "/barrel.png"}),
-            moving = tryLoadImage({"images/rowboat.png", "rowboat.png", "/rowboat.png"})
-        }
-        
-        sprites.background = tryLoadImage({"images/sea_background.png", "sea_background.png", "/sea_background.png"})
-        
-        sprites.items = {
-            coin = tryLoadImage({"images/coin.png", "coin.png", "/coin.png"}),
-            skull = tryLoadImage({"images/skull.png", "skull.png", "/skull.png"})
-        }
-    end)
-end
-
--- Cargar sonidos
-function loadSounds()
-    pcall(function()
-        -- Función para intentar múltiples rutas
-        local function tryLoadSound(paths, type)
-            for _, path in ipairs(paths) do
-                local success, sound = pcall(love.audio.newSource, path, type)
-                if success then
-                    return sound
-                end
-            end
-            return nil -- Ninguna ruta funcionó
-        end
-        
-        sounds.jump = tryLoadSound({"sounds/jump.wav", "jump.wav", "/jump.wav"}, "static")
-        sounds.splash = tryLoadSound({"sounds/splash.wav", "splash.wav", "/splash.wav"}, "static")
-        sounds.coin = tryLoadSound({"sounds/coin.wav", "coin.wav", "/coin.wav"}, "static")
-        sounds.gameOver = tryLoadSound({"sounds/gameover.wav", "gameover.wav", "/gameover.wav"}, "static")
-        sounds.music = tryLoadSound({"sounds/pirate_theme.mp3", "pirate_theme.mp3", "/pirate_theme.mp3"}, "stream")
-    end)
 end
 
 -- Actualizar estado del juego
@@ -278,9 +169,6 @@ function love.update(dt)
                                    itemX, itemY, 30, 30) then
                 platform.itemCollected = true
                 score = score + 5
-                if sounds.coin then
-                    sounds.coin:play()
-                end
             end
         end
         
@@ -318,9 +206,6 @@ function love.update(dt)
             if checkPlatformCollision(player, platform) then
                 player.falling = false
                 player.y = platform.y - player.height
-                if sounds.jump and player.isMoving then
-                    sounds.jump:play()
-                end
             end
         end
     end
@@ -328,12 +213,6 @@ function love.update(dt)
     -- Comprobar si el jugador ha caído fuera de la pantalla
     if player and player.y > love.graphics.getHeight() then
         gameOver = true
-        if sounds.splash then
-            sounds.splash:play()
-        end
-        if sounds.gameOver then
-            sounds.gameOver:play()
-        end
     end
     
     -- Comprobar si el jugador ha subido demasiado
@@ -380,60 +259,31 @@ function love.draw()
     end
 
     -- Dibujar fondo
-    if sprites.background then
-        love.graphics.setColor(1, 1, 1)
-        local bgScale = math.max(love.graphics.getWidth() / sprites.background:getWidth(), 
-                                 love.graphics.getHeight() / sprites.background:getHeight())
-        love.graphics.draw(sprites.background, 0, 0, 0, bgScale, bgScale)
-    else
-        love.graphics.setBackgroundColor(0.2, 0.4, 0.8) -- Color azul océano
-    end
+    love.graphics.setBackgroundColor(0.2, 0.4, 0.8) -- Color azul océano
     
     -- Asegurarnos que player existe antes de intentar dibujar plataformas
     if not player then return end
     
     -- Dibujar plataformas
     for _, platform in ipairs(platforms) do
-        -- Color según tipo de plataforma (fallback si no hay sprites)
-        if not sprites.platforms[platform.type] then
-            if platform.type == "normal" then
-                love.graphics.setColor(0.6, 0.4, 0.2) -- Marrón para tablas
-            elseif platform.type == "special" then
-                love.graphics.setColor(0.7, 0.6, 0.3) -- Dorado para barriles
-            elseif platform.type == "moving" then
-                love.graphics.setColor(0.5, 0.3, 0.2) -- Marrón oscuro para botes
-            end
-            love.graphics.rectangle("fill", platform.x, platform.y, platform.width, platform.height)
-        else
-            -- Dibujar sprite de plataforma
-            love.graphics.setColor(1, 1, 1)
-            local sprite = sprites.platforms[platform.type]
-            local scaleX = platform.width / sprite:getWidth()
-            local scaleY = platform.height / sprite:getHeight()
-            love.graphics.draw(sprite, platform.x, platform.y, 0, scaleX, scaleY)
+        -- Color según tipo de plataforma
+        if platform.type == "normal" then
+            love.graphics.setColor(0.6, 0.4, 0.2) -- Marrón para tablas
+        elseif platform.type == "special" then
+            love.graphics.setColor(0.7, 0.6, 0.3) -- Dorado para barriles
+        elseif platform.type == "moving" then
+            love.graphics.setColor(0.5, 0.3, 0.2) -- Marrón oscuro para botes
         end
+        love.graphics.rectangle("fill", platform.x, platform.y, platform.width, platform.height)
         
         -- Dibujar ítem si la plataforma lo tiene
         if platform.hasItem and not platform.itemCollected then
-            love.graphics.setColor(1, 1, 1)
-            local itemSprite = platform.itemType == "coin" and sprites.items.coin or sprites.items.skull
-            if itemSprite then
-                love.graphics.draw(itemSprite, 
-                                   platform.x + platform.width/2, 
-                                   platform.y - 20, 
-                                   platform.itemRotation, 
-                                   0.5, 0.5, 
-                                   itemSprite:getWidth()/2, 
-                                   itemSprite:getHeight()/2)
+            if platform.itemType == "coin" then
+                love.graphics.setColor(1, 0.8, 0)
+                love.graphics.circle("fill", platform.x + platform.width/2, platform.y - 20, 10)
             else
-                -- Fallback si no hay sprite
-                if platform.itemType == "coin" then
-                    love.graphics.setColor(1, 0.8, 0)
-                    love.graphics.circle("fill", platform.x + platform.width/2, platform.y - 20, 10)
-                else
-                    love.graphics.setColor(0.8, 0.8, 0.8)
-                    love.graphics.circle("fill", platform.x + platform.width/2, platform.y - 20, 10)
-                end
+                love.graphics.setColor(0.8, 0.8, 0.8)
+                love.graphics.circle("fill", platform.x + platform.width/2, platform.y - 20, 10)
             end
         end
     end
@@ -441,47 +291,34 @@ function love.draw()
     -- Asegurarnos que player existe antes de intentar dibujarlo
     if not player then return end
     
-    -- Dibujar jugador
-    love.graphics.setColor(1, 1, 1)
-    local playerSprite = nil
-    if player.direction and sprites.player then
-        playerSprite = player.direction == "right" and sprites.player.right or sprites.player.left
+    -- Dibujar jugador (modo simplificado sin imágenes)
+    -- Cuerpo
+    love.graphics.setColor(0.6, 0.1, 0.1) -- Rojo para el cuerpo
+    love.graphics.rectangle("fill", player.x, player.y, player.width, player.height)
+    
+    -- Cara
+    love.graphics.setColor(0.9, 0.8, 0.5) -- Color piel
+    love.graphics.rectangle("fill", player.x + 10, player.y + 5, player.width - 20, 20)
+    
+    -- Ojos
+    love.graphics.setColor(0, 0, 0)
+    if player.direction == "right" then
+        love.graphics.rectangle("fill", player.x + player.width - 20, player.y + 10, 5, 5)
+        -- Parche de pirata
+        love.graphics.rectangle("fill", player.x + 15, player.y + 8, 12, 10)
+    else
+        love.graphics.rectangle("fill", player.x + 15, player.y + 10, 5, 5)
+        -- Parche de pirata
+        love.graphics.rectangle("fill", player.x + player.width - 27, player.y + 8, 12, 10)
     end
     
-    if playerSprite then
-        local scaleX = player.width / playerSprite:getWidth()
-        local scaleY = player.height / playerSprite:getHeight()
-        love.graphics.draw(playerSprite, player.x, player.y, 0, scaleX, scaleY)
-    else
-        -- Fallback si no hay sprites - dibujar un jugador estilo pirata simplificado
-        -- Cuerpo
-        love.graphics.setColor(0.6, 0.1, 0.1) -- Rojo para el cuerpo
-        love.graphics.rectangle("fill", player.x, player.y, player.width, player.height)
-        
-        -- Cara
-        love.graphics.setColor(0.9, 0.8, 0.5) -- Color piel
-        love.graphics.rectangle("fill", player.x + 10, player.y + 5, player.width - 20, 20)
-        
-        -- Ojos
-        love.graphics.setColor(0, 0, 0)
-        if player.direction == "right" then
-            love.graphics.rectangle("fill", player.x + player.width - 20, player.y + 10, 5, 5)
-            -- Parche de pirata
-            love.graphics.rectangle("fill", player.x + 15, player.y + 8, 12, 10)
-        else
-            love.graphics.rectangle("fill", player.x + 15, player.y + 10, 5, 5)
-            -- Parche de pirata
-            love.graphics.rectangle("fill", player.x + player.width - 27, player.y + 8, 12, 10)
-        end
-        
-        -- Boca
-        love.graphics.rectangle("fill", player.x + 20, player.y + 20, 10, 3)
-        
-        -- Sombrero de pirata
-        love.graphics.setColor(0.1, 0.1, 0.3) -- Azul oscuro
-        love.graphics.rectangle("fill", player.x + 5, player.y, player.width - 10, 10)
-        love.graphics.rectangle("fill", player.x + 15, player.y - 5, player.width - 30, 5)
-    end
+    -- Boca
+    love.graphics.rectangle("fill", player.x + 20, player.y + 20, 10, 3)
+    
+    -- Sombrero de pirata
+    love.graphics.setColor(0.1, 0.1, 0.3) -- Azul oscuro
+    love.graphics.rectangle("fill", player.x + 5, player.y, player.width - 10, 10)
+    love.graphics.rectangle("fill", player.x + 15, player.y - 5, player.width - 30, 5)
     
     -- Mostrar puntuación con estilo de Monkey Island
     love.graphics.setColor(1, 1, 1)
@@ -513,15 +350,6 @@ function love.draw()
         love.graphics.printf("¡Camina la plancha, pirata!\nConseguiste " .. score .. " piezas de oro.\nPresiona 'R' para volver a embarcar.", 
                             70, love.graphics.getHeight() / 2 - 50, love.graphics.getWidth() - 140, "center")
     end
-    
-    -- Si estamos en web, mostrar mensaje sobre imágenes
-    if isWeb then
-        love.graphics.setColor(1, 1, 1, 0.7)
-        love.graphics.rectangle("fill", 10, love.graphics.getHeight() - 40, love.graphics.getWidth() - 20, 30)
-        love.graphics.setColor(0, 0, 0)
-        love.graphics.printf("Versión web - Fallbacks de gráficos activados", 
-                           15, love.graphics.getHeight() - 35, love.graphics.getWidth() - 30, "center")
-    end
 end
 
 -- Reiniciar el juego
@@ -547,12 +375,6 @@ function resetGame()
         player.y = 100
         player.x = love.graphics.getWidth() / 2 - player.width / 2
         player.falling = true
-    end
-    
-    -- Reiniciar música si estaba reproduciendo
-    if sounds.music then
-        sounds.music:stop()
-        sounds.music:play()
     end
 end
 
