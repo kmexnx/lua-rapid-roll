@@ -311,6 +311,30 @@ end
 
 -- Dibujar elementos del juego
 function love.draw()
+    -- Verificar que player existe
+    if not player then
+        -- Reiniciar el juego si player es nil
+        player = {
+            x = 0,
+            y = 0,
+            width = 50,
+            height = 60,
+            speed = 300,
+            falling = true,
+            direction = "right",
+            animTimer = 0,
+            animFrame = 1,
+            isMoving = false
+        }
+        
+        -- Inicializar posición del jugador
+        player.x = love.graphics.getWidth() / 2 - player.width / 2
+        player.y = 100
+        
+        resetGame()
+        return
+    end
+
     -- Dibujar fondo
     if sprites.background then
         love.graphics.setColor(1, 1, 1)
@@ -451,9 +475,11 @@ function resetGame()
     end
     
     -- Reiniciar posición del jugador
-    player.y = 100
-    player.x = love.graphics.getWidth() / 2 - player.width / 2
-    player.falling = true
+    if player then
+        player.y = 100
+        player.x = love.graphics.getWidth() / 2 - player.width / 2
+        player.falling = true
+    end
     
     -- Reiniciar música si estaba reproduciendo
     if sounds.music then
